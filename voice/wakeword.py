@@ -1,0 +1,1 @@
+# Wake word detection using a simple keyword spotting approach

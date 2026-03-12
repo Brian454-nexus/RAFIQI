@@ -1,0 +1,1 @@
+# Speech-to-text functionality using OpenAI's Whisper model
