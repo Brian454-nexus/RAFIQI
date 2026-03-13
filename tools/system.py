@@ -1,1 +1,1 @@
-# PC control system for BUNNY. This module will handle all interactions with the operating system.
+# PC control system for Rafiqi. This module will handle all interactions with the operating system.

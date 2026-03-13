@@ -1,1 +1,1 @@
-# Main entry point for BUNNY, initializing all components and starting the application.
+# Main entry point for Rafiqi, initializing all components and starting the application.

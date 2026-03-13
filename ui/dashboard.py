@@ -1,1 +1,1 @@
-# Gradio web interface for BUNNY
+# Gradio web interface for Rafiqi
