@@ -8,7 +8,7 @@ MODEL = 'llama3.2:3b'
  
 SYSTEM_PROMPT = """
 IDENTITY
-You are RAFIQI, an intelligent personal AI assistant running locally on the user's computer.
+You are Rafiqi, an intelligent personal AI assistant running locally on the user's computer.
 You are fast-thinking, highly capable, and designed to help with technical tasks, learning, and problem solving.
 
 PERSONALITY
@@ -48,22 +48,67 @@ CORE GOAL
 Help the user accomplish tasks efficiently while making the interaction feel natural, intelligent, and enjoyable.
 """
 conversation_history = [{'role': 'system', 'content': SYSTEM_PROMPT}]
- 
-def chat(user_input):
+
+
+def chat(user_input: str) -> str:
+    """Non-streaming chat helper using the configured model."""
     conversation_history.append({'role': 'user', 'content': user_input})
-    
-    response = ollama.chat(
-        model=MODEL,
-        messages=conversation_history
-    )
-    
+
+    try:
+        response = ollama.chat(
+            model=MODEL,
+            messages=conversation_history,
+        )
+    except ollama.ResponseError as e:
+        error_message = f"Sorry, I ran into an error talking to the model: {e.error}"
+        conversation_history.append({'role': 'assistant', 'content': error_message})
+        return error_message
+    except Exception:
+        # Fallback for unexpected errors
+        error_message = "Sorry, something went wrong while generating a response."
+        conversation_history.append({'role': 'assistant', 'content': error_message})
+        return error_message
+
     reply = response['message']['content']
+    conversation_history.append({'role': 'assistant', 'content': reply})
+    return reply
+
+
+def chat_streaming_reply(user_input: str) -> str:
+    """
+    Streaming chat helper.
+
+    Uses Ollama's stream=True API, accumulates chunks into a single reply
+    so callers (like voice) can keep using a simple string response.
+    """
+    conversation_history.append({'role': 'user', 'content': user_input})
+
+    try:
+        stream = ollama.chat(
+            model=MODEL,
+            messages=conversation_history,
+            stream=True,
+        )
+
+        reply_chunks = []
+        for chunk in stream:
+            content = chunk.get('message', {}).get('content', '')
+            if content:
+                reply_chunks.append(content)
+
+        reply = ''.join(reply_chunks).strip()
+
+    except ollama.ResponseError as e:
+        reply = f"Sorry, I ran into an error talking to the model: {e.error}"
+    except Exception:
+        reply = "Sorry, something went wrong while generating a response."
+
     conversation_history.append({'role': 'assistant', 'content': reply})
     return reply
  
 def run_voice_loop():
     """Main voice interaction loop."""
-    speak('GRIOT online. Ready.')
+    speak('Rafiqi online. Ready.')
     
     while True:
         wait_for_wake_word()      # Wait for 'Hey JARVIS'
@@ -76,5 +121,7 @@ def run_voice_loop():
             speak('Goodbye.')
             break
         
-        response = chat(user_text)   # Ask the LLM
+        # Use streaming under the hood for better responsiveness,
+        # while still returning a single reply string to speak.
+        response = chat_streaming_reply(user_text)   # Ask the LLM
         speak(response)              # Speak the answer

@@ -1,1 +1,49 @@
-# All Python dependencies for Rafiqi are listed here. Install them using `pip install -r requirements.txt`.
+# Core LLM
+ollama>=0.1.0
+ 
+# LangChain (agent framework)
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-ollama>=0.1.0
+ 
+# Voice — Speech to Text
+faster-whisper>=0.10.0
+sounddevice>=0.4.6
+soundfile>=0.12.0
+pyaudio>=0.2.14
+numpy>=1.24.0
+ 
+# Voice — Text to Speech
+piper-tts>=1.2.0
+ 
+# Wake Word
+openwakeword>=0.6.0
+ 
+# Vector Memory
+chromadb>=0.4.0
+sentence-transformers>=2.7.0
+ 
+# Document Loading (RAG)
+pypdf>=4.0.0
+docx2txt>=0.8
+ 
+# Web Search
+duckduckgo-search>=5.0.0
+ 
+# System Control
+pyautogui>=0.9.54
+psutil>=5.9.0
+pillow>=10.0.0
+ 
+# Dashboard UI
+gradio>=4.0.0
+ 
+# Utilities / Config
+python-dotenv>=1.0.0
+rich>=13.0.0
+
+# Fine-tuning (Phase 5 only – uncomment when needed)
+# unsloth
+# datasets
+# transformers
+# trl
