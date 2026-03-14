@@ -1,3 +1,4 @@
 voices/
 output.wav
 *.wav
+.venv/
