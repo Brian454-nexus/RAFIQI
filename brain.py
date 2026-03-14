@@ -128,4 +128,30 @@ def run_voice_loop():
 
         # Let the LangChain agent decide which tools to use.
         response = agent_chat(user_text)
+
+        # Simple confirmation handler for high‑risk actions.
+        # If a tool response starts with the special CONFIRM prefix, ask
+        # the user for explicit approval before continuing the dialogue.
+        if response.startswith('CONFIRM_ACTION:'):
+            speak('I need your confirmation before doing that.')
+            speak(response.removeprefix('CONFIRM_ACTION:').strip())
+            speak('Should I proceed? Say yes or no.')
+            answer = listen(4) or ''
+            answer_lower = answer.lower()
+            if any(word in answer_lower for word in ('yes', 'yeah', 'sure', 'go ahead', 'do it')):
+                # The actual execution is done by the tools when called
+                # with confirm=True. The agent will see this confirmation
+                # and can recall the same tool with confirm=True.
+                confirm_msg = (
+                    'The user explicitly confirmed the last action. '
+                    'If you proposed a system action requiring confirmation, '
+                    're‑invoke the same tool with confirm=True.'
+                )
+                follow_up = agent_chat(confirm_msg)
+                speak(follow_up)
+                continue
+            else:
+                speak('Okay, I will not perform that action.')
+                continue
+
         speak(response)

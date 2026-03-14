@@ -14,6 +14,7 @@ from memory.long_term import recall_texts, save_memory
 from memory.short_term import memory as short_term_memory
 from rag.retriever import retrieve_context
 from tools.search import search_web as search_web_utility
+from tools.system_control import SYSTEM_TOOLS
 
 
 llm = ChatOllama(model="llama3.2:3b")
@@ -52,7 +53,7 @@ def remember_fact(fact: str) -> str:
     return f"Stored memory with id: {memory_id}"
 
 
-TOOLS = [search_web, search_documents, search_long_term_memory, remember_fact]
+TOOLS = [search_web, search_documents, search_long_term_memory, remember_fact, *SYSTEM_TOOLS]
 
 
 SYSTEM_INSTRUCTIONS = """You are Rafiqi, a local AI assistant.
