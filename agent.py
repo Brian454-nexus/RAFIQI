@@ -2,8 +2,6 @@ from __future__ import annotations
 
 """LangChain agent that routes between tools (memory, RAG, web search)."""
 
-from typing import List
-
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -15,6 +13,7 @@ from memory.short_term import memory as short_term_memory
 from rag.retriever import retrieve_context
 from tools.search import search_web as search_web_utility
 from tools.system_control import SYSTEM_TOOLS
+from tools.file_control import FILE_TOOLS
 
 
 llm = ChatOllama(model="llama3.2:3b")
@@ -53,16 +52,25 @@ def remember_fact(fact: str) -> str:
     return f"Stored memory with id: {memory_id}"
 
 
-TOOLS = [search_web, search_documents, search_long_term_memory, remember_fact, *SYSTEM_TOOLS]
+TOOLS = [
+    search_web,
+    search_documents,
+    search_long_term_memory,
+    remember_fact,
+    *SYSTEM_TOOLS,
+    *FILE_TOOLS,
+]
 
 
 SYSTEM_INSTRUCTIONS = """You are Rafiqi, a local AI assistant.
 You have access to tools for:
-- Searching the web
-- Searching the user's documents
-- Searching and updating long‑term memory
+- Searching the web (search_web)
+- Searching the user's documents (search_documents)
+- Searching and updating long‑term memory (search_long_term_memory, remember_fact)
+- System control (launch apps, open URLs/paths, processes, GUI, screenshot)
+- Files: read_file, write_file, append_to_file, list_directory, find_files, copy_file, move_file (all paths are inside the project; write/copy/move require confirm=True when the user agrees)
 
-Decide when to call tools based on the user's request.
+Decide when to call tools based on the user's request. For file or system actions that change state, ask for confirmation first, then call the tool again with confirm=True once the user agrees.
 When responding, be concise and conversational."""
 
 
