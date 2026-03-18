@@ -4,7 +4,6 @@ ollama>=0.1.0
 # LangChain (agent framework)
 langchain>=0.2.0
 langchain-community>=0.2.0
-langchain-ollama>=0.1.0
  
 # Voice — Speech to Text
 faster-whisper>=0.10.0
@@ -41,6 +40,14 @@ gradio>=4.0.0
 # Utilities / Config
 python-dotenv>=1.0.0
 rich>=13.0.0
+
+# HTTP API for Rafiqi brain
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# LiveKit Agent (RTC participant)
+livekit>=1.1.2
+livekit-api>=1.1.0
 
 # Fine-tuning (Phase 5 only – uncomment when needed)
 # unsloth

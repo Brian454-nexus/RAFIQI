@@ -3,7 +3,7 @@ from __future__ import annotations
 """LangChain agent that routes between tools (memory, RAG, web search)."""
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_ollama import ChatOllama
+from langchain_community.chat_models import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import tool

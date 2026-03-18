@@ -4,7 +4,6 @@ from voice.listen import listen
 from voice.speak import speak
 from voice.wakeword import wait_for_wake_word
 from memory.short_term import memory as short_term_memory
-from agent import agent_chat
  
 MODEL = 'llama3.2:3b'
  
@@ -126,6 +125,7 @@ def run_voice_loop():
             speak('Goodbye.')
             break
 
+        from agent import agent_chat
         # Let the LangChain agent decide which tools to use.
         response = agent_chat(user_text)
 
