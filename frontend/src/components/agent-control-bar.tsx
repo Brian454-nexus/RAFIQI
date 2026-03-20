@@ -62,6 +62,31 @@ const MOTION_PROPS: MotionProps = {
   },
 };
 
+type SpeechRecognitionInstance = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult:
+    | ((
+        event: {
+          resultIndex: number;
+          results: ArrayLike<{
+            isFinal: boolean;
+            0: { transcript: string };
+            length: number;
+          }>;
+        },
+      ) => void)
+    | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
+
 interface AgentChatInputProps {
   chatOpen: boolean;
   onSend?: (message: string) => void;
@@ -265,10 +290,163 @@ export function AgentControlBar({
     handleMicrophoneDeviceSelectError,
     handleCameraDeviceSelectError,
   } = useInputControls({ onDeviceError, saveUserChoices });
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const recognitionRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wakeWindowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRecognitionActiveRef = useRef(false);
+  const isWakeArmedRef = useRef(false);
+  const isSendingVoiceRef = useRef(false);
+  const lastVoiceMessageRef = useRef<{ text: string; at: number } | null>(null);
+  const hasSpeechSupport =
+    typeof window !== 'undefined' &&
+    Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const [voiceStatus, setVoiceStatus] = useState<
+    'unsupported' | 'idle' | 'listening' | 'wake-armed' | 'error'
+  >(hasSpeechSupport ? 'idle' : 'unsupported');
 
   const handleSendMessage = async (message: string) => {
     await send(message);
   };
+
+  useEffect(() => {
+    if (!hasSpeechSupport || !isConnected || !microphoneToggle.enabled) {
+      setVoiceStatus(hasSpeechSupport ? 'idle' : 'unsupported');
+      return;
+    }
+
+    const Ctor = ((window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition) as SpeechRecognitionCtor | undefined;
+    if (!Ctor) return;
+
+    const recognition = new Ctor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    const clearWakeWindow = () => {
+      if (wakeWindowTimerRef.current) {
+        clearTimeout(wakeWindowTimerRef.current);
+        wakeWindowTimerRef.current = null;
+      }
+    };
+
+    const armWakeWindow = () => {
+      isWakeArmedRef.current = true;
+      setVoiceStatus('wake-armed');
+      clearWakeWindow();
+      wakeWindowTimerRef.current = setTimeout(() => {
+        isWakeArmedRef.current = false;
+        setVoiceStatus('listening');
+        wakeWindowTimerRef.current = null;
+      }, 8000);
+    };
+
+    const sendVoice = async (message: string) => {
+      const cleaned = message.trim();
+      if (!cleaned || isSendingVoiceRef.current) return;
+      const now = Date.now();
+      const last = lastVoiceMessageRef.current;
+      if (last && last.text === cleaned && now - last.at < 3000) {
+        return;
+      }
+      try {
+        isSendingVoiceRef.current = true;
+        await send(cleaned);
+        lastVoiceMessageRef.current = { text: cleaned, at: now };
+      } catch (error) {
+        console.error(error);
+      } finally {
+        isSendingVoiceRef.current = false;
+      }
+    };
+
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (!result?.isFinal) continue;
+
+        const transcript = result[0]?.transcript?.trim() ?? '';
+        if (!transcript) continue;
+
+        const lower = transcript.toLowerCase();
+        const wakeIndex = lower.indexOf('hey jarvis');
+        if (wakeIndex >= 0) {
+          const remainder = transcript.slice(wakeIndex + 'hey jarvis'.length).trim();
+          if (remainder) {
+            void sendVoice(remainder);
+            isWakeArmedRef.current = false;
+            clearWakeWindow();
+          } else {
+            void sendVoice(
+              'Wake-word detected. Give a very short greeting and ask what I need help with.',
+            );
+            armWakeWindow();
+          }
+          continue;
+        }
+
+        if (isWakeArmedRef.current) {
+          void sendVoice(transcript);
+          isWakeArmedRef.current = false;
+          clearWakeWindow();
+        }
+      }
+    };
+
+    recognition.onstart = () => {
+      isRecognitionActiveRef.current = true;
+      if (!isWakeArmedRef.current) {
+        setVoiceStatus('listening');
+      }
+    };
+
+    recognition.onend = () => {
+      isRecognitionActiveRef.current = false;
+      if (!isConnected) return;
+      if (!microphoneToggle.enabled) return;
+      recognitionRestartTimerRef.current = setTimeout(() => {
+        try {
+          recognition.start();
+        } catch {
+          // Browser can throw if start is called too quickly.
+        }
+      }, 600);
+    };
+
+    recognition.onerror = (event) => {
+      console.warn('[rafiqi] speech recognition error:', event?.error ?? 'unknown');
+      setVoiceStatus('error');
+      // Keep attempting to recover via onend restart logic.
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch {
+      setVoiceStatus('error');
+      console.warn('[rafiqi] speech recognition failed to start');
+    }
+
+    return () => {
+      clearWakeWindow();
+      if (recognitionRestartTimerRef.current) {
+        clearTimeout(recognitionRestartTimerRef.current);
+        recognitionRestartTimerRef.current = null;
+      }
+      const r = recognitionRef.current;
+      recognitionRef.current = null;
+      if (r && isRecognitionActiveRef.current) {
+        try {
+          r.stop();
+        } catch {
+          // no-op
+        }
+      }
+      isRecognitionActiveRef.current = false;
+      isWakeArmedRef.current = false;
+      setVoiceStatus(hasSpeechSupport ? 'idle' : 'unsupported');
+    };
+  }, [hasSpeechSupport, isConnected, microphoneToggle.enabled, send]);
 
   const visibleControls = {
     leave: controls?.leave ?? true,
@@ -307,6 +485,12 @@ export function AgentControlBar({
           className={cn(variant === 'livekit' && '[&_button]:rounded-full')}
         />
       </motion.div>
+
+      {hasSpeechSupport && isConnected && (
+        <div className="text-muted-foreground px-1 pb-2 text-[11px]">
+          Voice status: {voiceStatus === 'wake-armed' ? 'wake heard, speak command' : voiceStatus}
+        </div>
+      )}
 
       <div className="flex gap-1">
         <div className="flex grow gap-1">

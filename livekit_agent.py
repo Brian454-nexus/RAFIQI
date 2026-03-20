@@ -97,9 +97,30 @@ def _parse_chat_message(raw: str) -> Optional[ChatPayload]:
     if raw.startswith("{"):
         try:
             obj = json.loads(raw)
-            msg = obj.get("message")
-            if isinstance(msg, str) and msg.strip():
-                return ChatPayload(message=msg.strip())
+            if isinstance(obj, dict):
+                # Accept multiple common payload shapes from text chat and voice
+                # transcription providers.
+                candidate_keys = (
+                    "message",
+                    "text",
+                    "transcript",
+                    "utterance",
+                    "content",
+                    "final",
+                )
+                for key in candidate_keys:
+                    msg = obj.get(key)
+                    if isinstance(msg, str) and msg.strip():
+                        return ChatPayload(message=msg.strip())
+
+                # Some publishers nest the actual content under payload/data.
+                for container_key in ("payload", "data"):
+                    nested = obj.get(container_key)
+                    if isinstance(nested, dict):
+                        for key in candidate_keys:
+                            msg = nested.get(key)
+                            if isinstance(msg, str) and msg.strip():
+                                return ChatPayload(message=msg.strip())
         except Exception:
             return None
     return ChatPayload(message=raw)
@@ -352,10 +373,7 @@ async def main() -> None:
         if packet.participant and packet.participant.identity == identity:
             return
 
-        # Prefer listening only to the chat topic, but allow unknown/empty topics too.
         pkt_topic = getattr(packet, "topic", None)
-        if pkt_topic and pkt_topic != chat_topic:
-            return
 
         raw = _safe_decode(packet.data)
         payload = _parse_chat_message(raw)
@@ -368,6 +386,10 @@ async def main() -> None:
             return
         last_seen_ts = now
 
+        print(
+            f"[agent] recv topic='{pkt_topic or '(none)'}' from="
+            f"'{getattr(packet.participant, 'identity', 'unknown')}' msg='{payload.message[:120]}'"
+        )
         queue.put_nowait(payload.message)
 
     print("[agent] connected. Waiting for chat messages…")
